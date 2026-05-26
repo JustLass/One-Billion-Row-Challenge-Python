@@ -10,6 +10,8 @@ measurements1M.txt
 measurements10M.txt
 measurements100M.txt
 measurements.txt
+data/measurements.txt
+data/.measurements_expiry
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
@@ -186,4 +188,3 @@ pyrightconfig.json
 # End of https://www.toptal.com/developers/gitignore/api/python
 
 # Generated using ignr.py - github.com/Antrikshy/ignr.py
-

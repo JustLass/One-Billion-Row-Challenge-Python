@@ -2,6 +2,9 @@ import os
 import sys
 import random
 import time
+import tempfile   # cria arquivos temporários
+import atexit     # registra funções para rodar ao encerrar o programa
+import argparse   # lê argumentos da linha de comando (ex: --temp)
 
 
 def check_args(file_args):
@@ -84,7 +87,7 @@ def estimate_file_size(weather_station_names, num_rows_to_create):
     return f"O tamanho estimado do arquivo é:  {human_file_size}.\nO tamanho final será provavelmente muito menor (metade)."
 
 
-def build_test_data(weather_station_names, num_rows_to_create):
+def build_test_data(weather_station_names, num_rows_to_create, output_path="./data/measurements.txt"):
     """
     Generates and writes to file the requested length of test data
     """
@@ -98,7 +101,7 @@ def build_test_data(weather_station_names, num_rows_to_create):
     print('Criando o arquivo... isso vai demorar uns 10 minutos...')
 
     try:
-        with open("./data/measurements.txt", 'w', encoding="utf-8") as file:
+        with open(output_path, 'w', encoding="utf-8") as file:
             for s in range(0, num_rows_to_create // batch_size):
 
                 batch = random.choices(station_names_10k_max, k=batch_size)
@@ -115,23 +118,79 @@ def build_test_data(weather_station_names, num_rows_to_create):
 
     end_time = time.time()
     elapsed_time = end_time - start_time
-    file_size = os.path.getsize("./data/measurements.txt")
+    file_size = os.path.getsize(output_path)
     human_file_size = convert_bytes(file_size)
 
-    print("Arquivo escrito com sucesso data/measurements.txt")
+    print(f"Arquivo escrito com sucesso em: {output_path}")
     print(f"Tamanho final:  {human_file_size}")
     print(f"Tempo decorrido: {format_elapsed_time(elapsed_time)}")
 
 
+def verificar_e_deletar_arquivo_expirado(measurements_path="./data/measurements.txt"):
+    expiry_file = "./data/.measurements_expiry"
+
+    if os.path.exists(expiry_file):
+        with open(expiry_file, 'r') as f:
+            expiry_timestamp = float(f.read().strip())
+
+        if time.time() >= expiry_timestamp:
+            if os.path.exists(measurements_path):
+                os.remove(measurements_path)
+                print("Arquivo measurements.txt expirado e removido automaticamente.")
+            os.remove(expiry_file)
+
+
+def registrar_expiracao(measurements_path="./data/measurements.txt"):
+    expiry_file = "./data/.measurements_expiry"
+    expiry_timestamp = time.time() + 86400  # 24 horas em segundos
+
+    with open(expiry_file, 'w') as f:
+        f.write(str(expiry_timestamp))
+
+    print("\nAVISO: Este arquivo sera deletado automaticamente em 24 horas.")
+    print(
+        f"       Remocao agendada para: {time.strftime('%d/%m/%Y %H:%M', time.localtime(expiry_timestamp))}\n")
+
+
+def criar_arquivo_temporario():
+    tmp = tempfile.NamedTemporaryFile(
+        suffix='.txt', delete=False, encoding='utf-8', mode='w'
+    )
+    path = tmp.name
+    tmp.close()
+
+    print(f"\nAVISO: arquivo temporario criado em: {path}")
+    print("       Sera apagado automaticamente ao final.\n")
+
+    def cleanup():
+        if os.path.exists(path):
+            os.remove(path)
+            print(f"\nArquivo temporario removido: {path}")
+
+    atexit.register(cleanup)
+    return path
+
+
 def main():
-    """
-    main program function
-    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--temp',
+        action='store_true',
+        help='Cria arquivo temporario apagado automaticamente ao final'
+    )
+    args = parser.parse_args()
+
+    verificar_e_deletar_arquivo_expirado()
+
+    output_path = criar_arquivo_temporario() if args.temp else "./data/measurements.txt"
+
     num_rows_to_create = 1000000
-    weather_station_names = []
     weather_station_names = build_weather_station_name_list()
     print(estimate_file_size(weather_station_names, num_rows_to_create))
-    build_test_data(weather_station_names, num_rows_to_create)
+    build_test_data(weather_station_names, num_rows_to_create, output_path)
+
+    if not args.temp:
+        registrar_expiracao(output_path)
     print("Arquivo de teste finalizado.")
 
 
